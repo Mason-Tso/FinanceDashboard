@@ -24,8 +24,9 @@ export default async function InsidersPage() {
 
       <Card className="p-5">
         <p className="text-sm text-muted">
-          Looking for a specific company&apos;s insider filings? Search a ticker above — the{" "}
-          <span className="text-fg">Insider activity</span> panel on each stock page lists recent buys and sells.
+          Want a specific company? Search a ticker above — each stock page shows that company&apos;s{" "}
+          <span className="text-fg">congressional trades</span>. SEC corporate-insider filings need a higher Quiver
+          plan tier; upgrade Quiver to unlock them.
         </p>
       </Card>
     </div>

@@ -1,11 +1,13 @@
 import { AnalysisCard } from "@/components/AnalysisCard";
+import { CongressTable } from "@/components/CongressTable";
 import { InsiderTable } from "@/components/InsiderTable";
 import { NewsList } from "@/components/NewsList";
 import { Card, DeltaPill, SectionTitle, SourceTag } from "@/components/primitives";
 import { rulesAnalysis } from "@/lib/analysis";
-import { getKeyMetrics, getQuote, getStockNews } from "@/lib/fmp";
+import { getKeyMetrics, getQuote, getStockNews, type KeyMetrics } from "@/lib/fmp";
 import { compact, money } from "@/lib/format";
-import { getInsiderTrades } from "@/lib/quiver";
+import { mockQuote } from "@/lib/mock";
+import { getCongressTrades, getInsiderTrades } from "@/lib/quiver";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,12 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
   const { symbol } = await params;
   const sym = decodeURIComponent(symbol).toUpperCase();
 
-  const [quoteR, metricsR, newsR, insiderR] = await Promise.all([
-    getQuote(sym),
-    getKeyMetrics(sym),
+  const [quoteR, metricsR, newsR, insiderR, congressR] = await Promise.all([
+    getQuote(sym).catch(() => ({ data: mockQuote(sym), source: "mock" as const })),
+    getKeyMetrics(sym).catch(() => ({ data: {} as KeyMetrics, source: "mock" as const })),
     getStockNews(sym, 10).catch(() => ({ data: [], source: "mock" as const })),
-    getInsiderTrades(sym).catch(() => ({ data: [], source: "mock" as const })),
+    getInsiderTrades(sym).catch(() => ({ data: [], source: "unavailable" as const })),
+    getCongressTrades(sym, 15).catch(() => ({ data: [], source: "mock" as const })),
   ]);
 
   const quote = quoteR.data;
@@ -82,8 +85,24 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
           </Card>
 
           <Card className="p-5">
-            <SectionTitle right={<SourceTag source={insiderR.source} />}>Insider activity</SectionTitle>
-            <InsiderTable trades={insiderR.data} />
+            <SectionTitle right={<SourceTag source={congressR.source} />}>Congressional trades</SectionTitle>
+            <CongressTable trades={congressR.data} />
+          </Card>
+
+          <Card className="p-5">
+            <SectionTitle
+              right={insiderR.source === "unavailable" ? undefined : <SourceTag source={insiderR.source} />}
+            >
+              Insider activity
+            </SectionTitle>
+            {insiderR.source === "unavailable" ? (
+              <p className="text-sm text-faint">
+                SEC corporate-insider data isn&apos;t included in your current Quiver plan. Upgrade Quiver to enable
+                this panel — congressional trades above are available now.
+              </p>
+            ) : (
+              <InsiderTable trades={insiderR.data} />
+            )}
           </Card>
         </div>
       </div>

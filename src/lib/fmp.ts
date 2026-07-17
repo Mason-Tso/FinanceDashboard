@@ -1,8 +1,9 @@
 /**
  * Financial Modeling Prep client (market data, fundamentals, news).
  *
- * Server-only. Falls back to mock data when FMP_API_KEY is not set so the app
- * is runnable immediately. All returned payloads carry a `source` marker.
+ * Uses FMP's current "stable" API (the legacy /api/v3 endpoints were retired
+ * Aug 31, 2025). Server-only. Falls back to mock data when FMP_API_KEY is not
+ * set. All returned payloads carry a `source` marker.
  */
 
 import "server-only";
@@ -10,7 +11,7 @@ import { env } from "./env";
 import { mockNews, mockQuote } from "./mock";
 import type { NewsItem, Quote } from "./types";
 
-const BASE = "https://financialmodelingprep.com/api/v3";
+const BASE = "https://financialmodelingprep.com/stable";
 
 export type Sourced<T> = { data: T; source: "fmp" | "mock" };
 
@@ -32,21 +33,20 @@ interface FmpQuote {
   name: string;
   price: number;
   change: number;
-  changesPercentage: number;
+  changePercentage: number;
   dayLow: number;
   dayHigh: number;
   yearLow: number;
   yearHigh: number;
   marketCap: number;
   volume: number;
-  pe: number;
 }
 
 export async function getQuote(symbol: string): Promise<Sourced<Quote>> {
   const sym = symbol.toUpperCase();
   if (!env.fmp.isConfigured) return { data: mockQuote(sym), source: "mock" };
 
-  const rows = await fmpGet<FmpQuote[]>(`/quote/${sym}`);
+  const rows = await fmpGet<FmpQuote[]>(`/quote`, { symbol: sym });
   const q = rows?.[0];
   if (!q) throw new Error(`No quote returned for ${sym}`);
   return {
@@ -56,14 +56,13 @@ export async function getQuote(symbol: string): Promise<Sourced<Quote>> {
       name: q.name,
       price: q.price,
       change: q.change,
-      changePercent: q.changesPercentage,
+      changePercent: q.changePercentage,
       dayLow: q.dayLow,
       dayHigh: q.dayHigh,
       yearLow: q.yearLow,
       yearHigh: q.yearHigh,
       marketCap: q.marketCap,
       volume: q.volume,
-      pe: q.pe,
     },
   };
 }
@@ -71,6 +70,7 @@ export async function getQuote(symbol: string): Promise<Sourced<Quote>> {
 interface FmpNews {
   symbol?: string;
   publishedDate: string;
+  publisher?: string;
   title: string;
   image?: string;
   site: string;
@@ -84,7 +84,7 @@ function mapNews(rows: FmpNews[]): NewsItem[] {
     title: n.title,
     summary: n.text?.slice(0, 240),
     url: n.url,
-    source: n.site,
+    source: n.publisher ?? n.site,
     publishedAt: new Date(n.publishedDate).toISOString(),
     symbols: n.symbol ? [n.symbol] : undefined,
   }));
@@ -94,14 +94,14 @@ function mapNews(rows: FmpNews[]): NewsItem[] {
 export async function getStockNews(symbol: string, limit = 20): Promise<Sourced<NewsItem[]>> {
   const sym = symbol.toUpperCase();
   if (!env.fmp.isConfigured) return { data: mockNews(sym), source: "mock" };
-  const rows = await fmpGet<FmpNews[]>(`/stock_news`, { tickers: sym, limit: String(limit) });
+  const rows = await fmpGet<FmpNews[]>(`/news/stock`, { symbols: sym, limit: String(limit) });
   return { data: mapNews(rows), source: "fmp" };
 }
 
 /** General market-moving news across large caps. */
 export async function getMarketNews(limit = 30): Promise<Sourced<NewsItem[]>> {
   if (!env.fmp.isConfigured) return { data: mockNews(), source: "mock" };
-  const rows = await fmpGet<FmpNews[]>(`/stock_news`, { limit: String(limit) });
+  const rows = await fmpGet<FmpNews[]>(`/news/general-latest`, { limit: String(limit) });
   return { data: mapNews(rows), source: "fmp" };
 }
 
@@ -115,7 +115,7 @@ export interface KeyMetrics {
   netProfitMarginTtm?: number;
 }
 
-/** Trailing-twelve-month ratios used to seed the rules-based signal. */
+/** TTM ratios + metrics used to seed the rules-based signal. */
 export async function getKeyMetrics(symbol: string): Promise<Sourced<KeyMetrics>> {
   const sym = symbol.toUpperCase();
   if (!env.fmp.isConfigured) {
@@ -124,18 +124,24 @@ export async function getKeyMetrics(symbol: string): Promise<Sourced<KeyMetrics>
       data: { peTtm: 22, pbTtm: 4, debtToEquityTtm: 0.6, roeTtm: 0.25, currentRatioTtm: 1.4, netProfitMarginTtm: 0.2 },
     };
   }
-  const rows = await fmpGet<Record<string, number>[]>(`/ratios-ttm/${sym}`);
-  const r = rows?.[0] ?? {};
+
+  // Valuation ratios live in ratios-ttm; ROE lives in key-metrics-ttm.
+  const [ratiosRows, metricsRows] = await Promise.all([
+    fmpGet<Record<string, number>[]>(`/ratios-ttm`, { symbol: sym }),
+    fmpGet<Record<string, number>[]>(`/key-metrics-ttm`, { symbol: sym }).catch(() => [] as Record<string, number>[]),
+  ]);
+  const r = ratiosRows?.[0] ?? {};
+  const m = metricsRows?.[0] ?? {};
   return {
     source: "fmp",
     data: {
-      peTtm: r.peRatioTTM,
+      peTtm: r.priceToEarningsRatioTTM,
       pbTtm: r.priceToBookRatioTTM,
-      debtToEquityTtm: r.debtEquityRatioTTM,
-      roeTtm: r.returnOnEquityTTM,
+      debtToEquityTtm: r.debtToEquityRatioTTM,
       currentRatioTtm: r.currentRatioTTM,
       dividendYieldTtm: r.dividendYieldTTM,
       netProfitMarginTtm: r.netProfitMarginTTM,
+      roeTtm: m.returnOnEquityTTM,
     },
   };
 }
