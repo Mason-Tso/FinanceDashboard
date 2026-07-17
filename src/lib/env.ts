@@ -35,9 +35,15 @@ export const env = {
   snaptrade: {
     clientId: read("SNAPTRADE_CLIENT_ID"),
     consumerKey: read("SNAPTRADE_CONSUMER_KEY"),
+    // Personal keys auto-provision a user whose id is your SnapTrade email.
     userId: read("SNAPTRADE_USER_ID") ?? "local-user",
+    userSecret: read("SNAPTRADE_USER_SECRET"),
     get isConfigured() {
       return Boolean(this.clientId && this.consumerKey);
+    },
+    /** Whether we can actually read the portfolio (needs the user secret too). */
+    get canReadPortfolio() {
+      return Boolean(this.clientId && this.consumerKey && this.userSecret);
     },
   },
   ai: {

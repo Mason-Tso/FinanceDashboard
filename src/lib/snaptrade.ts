@@ -1,26 +1,17 @@
 /**
- * SnapTrade client — connects Robinhood (and other brokerages) read-only and
- * returns a normalised Portfolio.
+ * SnapTrade client — reads the connected Robinhood portfolio (read-only).
  *
- * SnapTrade's flow needs a per-user `userSecret` returned at registration. For
- * this single-user local app we persist it to a gitignored JSON file next to
- * the project. Server-only. Falls back to mock data until configured/connected.
+ * This app uses SnapTrade **personal keys**, where a single user is
+ * auto-provisioned at signup (userId = your SnapTrade email) and `registerUser`
+ * is not available. So we authenticate with the userId + userSecret supplied via
+ * env rather than registering a user. Server-only. Mock until userSecret is set.
  */
 
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { Snaptrade } from "snaptrade-typescript-sdk";
 import { env } from "./env";
 import { mockPortfolio } from "./mock";
 import type { Portfolio, Position } from "./types";
-
-const STORE = path.join(process.cwd(), ".snaptrade-user.json");
-
-interface StoredUser {
-  userId: string;
-  userSecret: string;
-}
 
 let client: Snaptrade | null = null;
 function getClient(): Snaptrade {
@@ -34,54 +25,21 @@ function getClient(): Snaptrade {
   return client;
 }
 
-async function readStore(): Promise<StoredUser | null> {
-  try {
-    return JSON.parse(await fs.readFile(STORE, "utf8")) as StoredUser;
-  } catch {
-    return null;
-  }
+function getUser(): { userId: string; userSecret: string } {
+  if (!env.snaptrade.userSecret) throw new Error("SNAPTRADE_USER_SECRET is not set");
+  return { userId: env.snaptrade.userId, userSecret: env.snaptrade.userSecret };
 }
 
-async function writeStore(u: StoredUser): Promise<void> {
-  await fs.writeFile(STORE, JSON.stringify(u, null, 2), "utf8");
-}
-
-/** Register the local user with SnapTrade if not already, returning the secret. */
-export async function ensureUser(): Promise<StoredUser> {
-  const existing = await readStore();
-  if (existing?.userSecret) return existing;
-
-  const sdk = getClient();
-  const userId = env.snaptrade.userId;
-  const res = await sdk.authentication.registerSnapTradeUser({ userId });
-  const userSecret = res.data.userSecret;
-  if (!userSecret) throw new Error("SnapTrade did not return a userSecret");
-  const stored: StoredUser = { userId, userSecret };
-  await writeStore(stored);
-  return stored;
-}
-
-/** True once the user has linked at least one brokerage. */
+/** True once at least one brokerage is linked to the user. */
 export async function isConnected(): Promise<boolean> {
-  if (!env.snaptrade.isConfigured) return false;
-  const user = await readStore();
-  if (!user) return false;
-  const sdk = getClient();
-  const accounts = await sdk.accountInformation.listUserAccounts({
-    userId: user.userId,
-    userSecret: user.userSecret,
-  });
+  if (!env.snaptrade.isConfigured || !env.snaptrade.userSecret) return false;
+  const accounts = await getClient().accountInformation.listUserAccounts(getUser());
   return (accounts.data?.length ?? 0) > 0;
 }
 
-/** Returns the SnapTrade Connection Portal URL to link a brokerage. */
+/** SnapTrade Connection Portal URL to link an additional brokerage. */
 export async function getConnectUrl(): Promise<string> {
-  const user = await ensureUser();
-  const sdk = getClient();
-  const res = await sdk.authentication.loginSnapTradeUser({
-    userId: user.userId,
-    userSecret: user.userSecret,
-  });
+  const res = await getClient().authentication.loginSnapTradeUser(getUser());
   const url = (res.data as { redirectURI?: string }).redirectURI;
   if (!url) throw new Error("SnapTrade did not return a redirect URL");
   return url;
@@ -103,20 +61,18 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Fetch and normalise the connected portfolio; mock until configured. */
+/** Fetch and normalise the connected portfolio; mock until userSecret is set. */
 export async function getPortfolio(): Promise<Portfolio> {
   if (!env.snaptrade.isConfigured) return mockPortfolio();
-
-  const user = await readStore();
-  if (!user) return { ...mockPortfolio(), accountName: "Not linked yet — mock data" };
+  if (!env.snaptrade.userSecret) {
+    return { ...mockPortfolio(), accountName: "Add SNAPTRADE_USER_SECRET to go live — sample data" };
+  }
 
   const sdk = getClient();
-  const accounts = await sdk.accountInformation.listUserAccounts({
-    userId: user.userId,
-    userSecret: user.userSecret,
-  });
+  const user = getUser();
+  const accounts = await sdk.accountInformation.listUserAccounts(user);
   const account = accounts.data?.[0];
-  if (!account?.id) return { ...mockPortfolio(), accountName: "Not linked yet — mock data" };
+  if (!account?.id) return { ...mockPortfolio(), accountName: "No brokerage linked yet — sample data" };
 
   const holdings = await sdk.accountInformation.getUserHoldings({
     accountId: account.id,
@@ -126,7 +82,9 @@ export async function getPortfolio(): Promise<Portfolio> {
 
   const rawPositions = (holdings.data.positions ?? []) as Row[];
   const positions: Position[] = rawPositions.map((p) => {
-    const symbol = String(pluck<string>(p, "symbol", "symbol", "symbol") ?? pluck<string>(p, "symbol", "symbol", "raw_symbol") ?? "—").toUpperCase();
+    const symbol = String(
+      pluck<string>(p, "symbol", "symbol", "symbol") ?? pluck<string>(p, "symbol", "symbol", "raw_symbol") ?? "—",
+    ).toUpperCase();
     const name = String(pluck<string>(p, "symbol", "symbol", "description") ?? symbol);
     const quantity = num(p.units ?? p.fractional_units);
     const price = num(p.price);

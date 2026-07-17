@@ -38,17 +38,18 @@ export default function SettingsPage() {
       </div>
 
       <Card className="p-5">
-        <SectionTitle>Connect Robinhood</SectionTitle>
+        <SectionTitle>Robinhood via SnapTrade</SectionTitle>
         <p className="mb-4 text-sm text-muted">
-          Linking runs through SnapTrade&apos;s secure portal — you enter your Robinhood login on{" "}
-          <span className="text-fg">SnapTrade&apos;s</span> site, never here. Access is read-only; the dashboard cannot
-          place trades.
+          With SnapTrade personal keys, your account is already provisioned — set your{" "}
+          <code className="tnum text-fg">SNAPTRADE_USER_SECRET</code> and holdings flow in automatically (read-only; the
+          dashboard cannot place trades). Use the button below only to link an additional brokerage.
         </p>
-        <ConnectButton disabled={!env.snaptrade.isConfigured} />
-        {!env.snaptrade.isConfigured && (
+        <ConnectButton disabled={!env.snaptrade.canReadPortfolio} />
+        {!env.snaptrade.canReadPortfolio && (
           <p className="mt-3 text-xs text-warn">
-            Add <code className="tnum">SNAPTRADE_CLIENT_ID</code> and <code className="tnum">SNAPTRADE_CONSUMER_KEY</code>{" "}
-            to <code className="tnum">.env.local</code>, then restart the dev server.
+            Add <code className="tnum">SNAPTRADE_USER_ID</code> (your SnapTrade email) and{" "}
+            <code className="tnum">SNAPTRADE_USER_SECRET</code> (from your SnapTrade dashboard) to{" "}
+            <code className="tnum">.env.local</code>, then restart the dev server.
           </p>
         )}
       </Card>
@@ -57,7 +58,11 @@ export default function SettingsPage() {
         <SectionTitle>Data sources</SectionTitle>
         <StatusRow label="FMP" ok={env.fmp.isConfigured} detail="Quotes, fundamentals, news" />
         <StatusRow label="Quiver" ok={env.quiver.isConfigured} detail="Insider & congressional trades" />
-        <StatusRow label="SnapTrade" ok={env.snaptrade.isConfigured} detail="Brokerage / Robinhood connection" />
+        <StatusRow
+          label="SnapTrade"
+          ok={env.snaptrade.canReadPortfolio}
+          detail={env.snaptrade.isConfigured && !env.snaptrade.userSecret ? "Keys set — add user secret to read holdings" : "Robinhood holdings (read-only)"}
+        />
         <StatusRow label="AI analysis" ok={env.ai.isConfigured} detail={aiDetail} />
       </Card>
     </div>
