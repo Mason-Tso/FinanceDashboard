@@ -32,13 +32,6 @@ export const env = {
       return Boolean(this.apiKey);
     },
   },
-  hydromancer: {
-    apiKey: read("HYDROMANCER_API_KEY"),
-    baseUrl: read("HYDROMANCER_BASE_URL"),
-    get isConfigured() {
-      return Boolean(this.apiKey && this.baseUrl);
-    },
-  },
   snaptrade: {
     clientId: read("SNAPTRADE_CLIENT_ID"),
     consumerKey: read("SNAPTRADE_CONSUMER_KEY"),

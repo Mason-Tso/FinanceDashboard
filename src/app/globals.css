@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ─────────────────────────────────────────────────────────────
+   FinanceDashboard design system — dark-first premium fintech.
+   Tokens are exposed as Tailwind utilities via @theme
+   (e.g. bg-surface, text-muted, border-line, text-up).
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --color-bg: #090b10;
+  --color-bg-elev: #0e1118;
+  --color-surface: #141821;
+  --color-surface-2: #1b202b;
+  --color-line: #242a37;
+  --color-line-soft: #1c212c;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-fg: #e8eaf0;
+  --color-muted: #949bad;
+  --color-faint: #626a7d;
+
+  --color-accent: #6d5efc;
+  --color-accent-soft: #211f3d;
+  --color-up: #21d07a;
+  --color-up-soft: #10281f;
+  --color-down: #f6465d;
+  --color-down-soft: #2a1620;
+  --color-warn: #f7a53b;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(900px 500px at 12% -8%, #171334 0%, rgba(23, 19, 52, 0) 55%),
+    radial-gradient(800px 500px at 100% 0%, #0c2330 0%, rgba(12, 35, 48, 0) 50%),
+    var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular, monospaced numerals for all financial figures. */
+.tnum {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Frosted card surface used across the dashboard. */
+.card {
+  background: color-mix(in oklab, var(--color-surface) 92%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
+}
+
+.card-hover {
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.card-hover:hover {
+  border-color: color-mix(in oklab, var(--color-accent) 45%, var(--color-line));
+  transform: translateY(-1px);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-2);
+  background-clip: padding-box;
 }
