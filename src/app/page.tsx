@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AllocationDonut } from "@/components/AllocationDonut";
+import { HoldingsPanel } from "@/components/HoldingsPanel";
 import { NewsList } from "@/components/NewsList";
-import { PositionsTable } from "@/components/PositionsTable";
 import { SectorRadar } from "@/components/SectorRadar";
 import { Card, DeltaPill, SectionTitle, SourceTag } from "@/components/primitives";
 import { getBatchQuotes, getMarketNews } from "@/lib/fmp";
@@ -40,14 +40,9 @@ export default async function DashboardPage() {
   ]);
 
   const signals: Record<string, QuickSignal> = {};
-  const counts = { buy: 0, hold: 0, sell: 0 };
   for (const p of portfolio.positions) {
     const q = quotes.get(p.symbol);
-    if (q) {
-      const s = momentumSignal(q);
-      signals[p.symbol] = s;
-      counts[s.signal] += 1;
-    }
+    if (q) signals[p.symbol] = momentumSignal(q);
   }
   const sectors = predictSectors(news.data, 5);
 
@@ -96,21 +91,10 @@ export default async function DashboardPage() {
           <SectionTitle right={<SourceTag source={isSample ? "mock" : "snaptrade"} />}>
             Holdings · buy/hold/sell
           </SectionTitle>
-          <div className="mb-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-up-soft px-2 py-1 text-xs font-medium text-up">
-              <span className="tnum text-sm font-semibold">{counts.buy}</span> Buy
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-warn/10 px-2 py-1 text-xs font-medium text-warn">
-              <span className="tnum text-sm font-semibold">{counts.hold}</span> Hold
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-down-soft px-2 py-1 text-xs font-medium text-down">
-              <span className="tnum text-sm font-semibold">{counts.sell}</span> Sell
-            </span>
-          </div>
-          <PositionsTable positions={portfolio.positions} signals={signals} />
+          <HoldingsPanel positions={portfolio.positions} signals={signals} />
           <p className="mt-3 text-xs text-faint">
-            Signals are a quick momentum read (price vs its trend). Hover a badge for the why; open a stock for full
-            analysis. Educational only — not financial advice.
+            Signals are a quick momentum read (price vs its trend). Click a chip to filter; hover a badge for the why.
+            Educational only — not financial advice.
           </p>
         </Card>
 
