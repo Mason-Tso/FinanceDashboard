@@ -15,6 +15,8 @@ export interface Quote {
   marketCap?: number;
   volume?: number;
   pe?: number;
+  priceAvg50?: number;
+  priceAvg200?: number;
 }
 
 export interface Position {

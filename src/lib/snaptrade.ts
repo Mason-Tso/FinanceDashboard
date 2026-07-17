@@ -12,6 +12,7 @@
 
 import "server-only";
 import { Snaptrade } from "snaptrade-typescript-sdk";
+import { cached } from "./cache";
 import { env } from "./env";
 import { mockPortfolio } from "./mock";
 import type { Portfolio, Position } from "./types";
@@ -92,7 +93,10 @@ function mapPosition(p: Row): Position {
 /** Fetch and normalise the connected portfolio (aggregated across accounts). */
 export async function getPortfolio(): Promise<Portfolio> {
   if (!env.snaptrade.isConfigured) return mockPortfolio();
+  return cached("snaptrade:portfolio", 60_000, fetchPortfolioLive);
+}
 
+async function fetchPortfolioLive(): Promise<Portfolio> {
   const sdk = getClient();
   const { userId, userSecret } = await resolveUser();
   const accountsRes = await sdk.accountInformation.listUserAccounts({ userId, userSecret });

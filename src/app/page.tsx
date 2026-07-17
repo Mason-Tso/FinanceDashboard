@@ -2,9 +2,12 @@ import Link from "next/link";
 import { AllocationDonut } from "@/components/AllocationDonut";
 import { NewsList } from "@/components/NewsList";
 import { PositionsTable } from "@/components/PositionsTable";
+import { SectorRadar } from "@/components/SectorRadar";
 import { Card, DeltaPill, SectionTitle, SourceTag } from "@/components/primitives";
-import { getMarketNews } from "@/lib/fmp";
+import { getBatchQuotes, getMarketNews } from "@/lib/fmp";
 import { money, percent } from "@/lib/format";
+import { predictSectors } from "@/lib/sectors";
+import { momentumSignal, type QuickSignal } from "@/lib/signals";
 import { getPortfolio } from "@/lib/snaptrade";
 import type { Portfolio } from "@/lib/types";
 
@@ -19,15 +22,7 @@ async function safePortfolio(): Promise<Portfolio> {
   }
 }
 
-function StatCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: React.ReactNode;
-}) {
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: React.ReactNode }) {
   return (
     <Card className="p-4">
       <div className="text-xs uppercase tracking-wide text-faint">{label}</div>
@@ -38,10 +33,19 @@ function StatCard({
 }
 
 export default async function DashboardPage() {
-  const [portfolio, news] = await Promise.all([
-    safePortfolio(),
-    getMarketNews(12).catch(() => ({ data: [], source: "mock" as const })),
+  const portfolio = await safePortfolio();
+  const [news, quotes] = await Promise.all([
+    getMarketNews(14).catch(() => ({ data: [], source: "mock" as const })),
+    getBatchQuotes(portfolio.positions.map((p) => p.symbol)).catch(() => new Map()),
   ]);
+
+  const signals: Record<string, QuickSignal> = {};
+  for (const p of portfolio.positions) {
+    const q = quotes.get(p.symbol);
+    if (q) signals[p.symbol] = momentumSignal(q);
+  }
+  const sectors = predictSectors(news.data, 5);
+
   const isSample =
     portfolio.isMock ||
     portfolio.accountName?.toLowerCase().includes("sample") ||
@@ -81,11 +85,17 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Main grid */}
+      {/* Holdings + allocation */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
-          <SectionTitle right={<SourceTag source={isSample ? "mock" : "snaptrade"} />}>Holdings</SectionTitle>
-          <PositionsTable positions={portfolio.positions} />
+          <SectionTitle right={<SourceTag source={isSample ? "mock" : "snaptrade"} />}>
+            Holdings · buy/hold/sell
+          </SectionTitle>
+          <PositionsTable positions={portfolio.positions} signals={signals} />
+          <p className="mt-3 text-xs text-faint">
+            Signals are a quick momentum read (price vs its trend). Hover a badge for the why; open a stock for full
+            analysis. Educational only — not financial advice.
+          </p>
         </Card>
 
         <Card className="p-5">
@@ -105,11 +115,19 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* News */}
-      <Card className="p-5">
-        <SectionTitle right={<SourceTag source={news.source} />}>Market-moving news</SectionTitle>
-        <NewsList items={news.data} limit={12} />
-      </Card>
+      {/* News + sector radar */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card className="p-5 lg:col-span-2">
+          <SectionTitle right={<SourceTag source={news.source} />}>Market-moving news</SectionTitle>
+          <NewsList items={news.data} limit={12} />
+        </Card>
+
+        <Card className="p-5">
+          <SectionTitle>Sector radar</SectionTitle>
+          <p className="mb-3 text-xs text-faint">Where the news flow is pointing — momentum, not a forecast.</p>
+          <SectorRadar sectors={sectors} />
+        </Card>
+      </div>
     </div>
   );
 }

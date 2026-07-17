@@ -7,6 +7,7 @@
  */
 
 import "server-only";
+import { cached } from "./cache";
 import { env } from "./env";
 import { mockNews, mockQuote } from "./mock";
 import type { NewsItem, Quote } from "./types";
@@ -40,31 +41,51 @@ interface FmpQuote {
   yearHigh: number;
   marketCap: number;
   volume: number;
+  priceAvg50?: number;
+  priceAvg200?: number;
+}
+
+function mapQuote(q: FmpQuote): Quote {
+  return {
+    symbol: q.symbol,
+    name: q.name,
+    price: q.price,
+    change: q.change,
+    changePercent: q.changePercentage,
+    dayLow: q.dayLow,
+    dayHigh: q.dayHigh,
+    yearLow: q.yearLow,
+    yearHigh: q.yearHigh,
+    marketCap: q.marketCap,
+    volume: q.volume,
+    priceAvg50: q.priceAvg50,
+    priceAvg200: q.priceAvg200,
+  };
 }
 
 export async function getQuote(symbol: string): Promise<Sourced<Quote>> {
   const sym = symbol.toUpperCase();
   if (!env.fmp.isConfigured) return { data: mockQuote(sym), source: "mock" };
 
-  const rows = await fmpGet<FmpQuote[]>(`/quote`, { symbol: sym });
+  const rows = await cached(`fmp:quote:${sym}`, 30_000, () => fmpGet<FmpQuote[]>(`/quote`, { symbol: sym }));
   const q = rows?.[0];
   if (!q) throw new Error(`No quote returned for ${sym}`);
-  return {
-    source: "fmp",
-    data: {
-      symbol: q.symbol,
-      name: q.name,
-      price: q.price,
-      change: q.change,
-      changePercent: q.changePercentage,
-      dayLow: q.dayLow,
-      dayHigh: q.dayHigh,
-      yearLow: q.yearLow,
-      yearHigh: q.yearHigh,
-      marketCap: q.marketCap,
-      volume: q.volume,
-    },
-  };
+  return { source: "fmp", data: mapQuote(q) };
+}
+
+/** Many quotes in a single request — used to price the whole portfolio fast. */
+export async function getBatchQuotes(symbols: string[]): Promise<Map<string, Quote>> {
+  const out = new Map<string, Quote>();
+  const syms = [...new Set(symbols.map((s) => s.toUpperCase()))].filter(Boolean);
+  if (syms.length === 0) return out;
+  if (!env.fmp.isConfigured) {
+    for (const s of syms) out.set(s, mockQuote(s));
+    return out;
+  }
+  const key = `fmp:batch:${syms.slice().sort().join(",")}`;
+  const rows = await cached(key, 30_000, () => fmpGet<FmpQuote[]>(`/batch-quote`, { symbols: syms.join(",") }));
+  for (const q of rows ?? []) out.set(q.symbol.toUpperCase(), mapQuote(q));
+  return out;
 }
 
 interface FmpNews {
@@ -101,7 +122,9 @@ export async function getStockNews(symbol: string, limit = 20): Promise<Sourced<
 /** General market-moving news across large caps. */
 export async function getMarketNews(limit = 30): Promise<Sourced<NewsItem[]>> {
   if (!env.fmp.isConfigured) return { data: mockNews(), source: "mock" };
-  const rows = await fmpGet<FmpNews[]>(`/news/general-latest`, { limit: String(limit) });
+  const rows = await cached(`fmp:marketnews:${limit}`, 120_000, () =>
+    fmpGet<FmpNews[]>(`/news/general-latest`, { limit: String(limit) }),
+  );
   return { data: mapNews(rows), source: "fmp" };
 }
 
@@ -126,10 +149,12 @@ export async function getKeyMetrics(symbol: string): Promise<Sourced<KeyMetrics>
   }
 
   // Valuation ratios live in ratios-ttm; ROE lives in key-metrics-ttm.
-  const [ratiosRows, metricsRows] = await Promise.all([
-    fmpGet<Record<string, number>[]>(`/ratios-ttm`, { symbol: sym }),
-    fmpGet<Record<string, number>[]>(`/key-metrics-ttm`, { symbol: sym }).catch(() => [] as Record<string, number>[]),
-  ]);
+  const [ratiosRows, metricsRows] = await cached(`fmp:metrics:${sym}`, 3_600_000, () =>
+    Promise.all([
+      fmpGet<Record<string, number>[]>(`/ratios-ttm`, { symbol: sym }),
+      fmpGet<Record<string, number>[]>(`/key-metrics-ttm`, { symbol: sym }).catch(() => [] as Record<string, number>[]),
+    ]),
+  );
   const r = ratiosRows?.[0] ?? {};
   const m = metricsRows?.[0] ?? {};
   return {

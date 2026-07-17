@@ -14,9 +14,15 @@ if %errorlevel%==0 (
   goto openbrowser
 )
 
+REM Ensure a fast production build exists (avoids dev-mode lag).
+if not exist ".next\BUILD_ID" (
+  echo First-time setup: building the app ^(about 20-30 seconds, one time^)...
+  call npm run build
+)
+
 echo Starting the dashboard server...
-echo (A second window will open - you can minimize it. Close it to stop the dashboard.)
-start "Finance Dashboard Server" cmd /k "npm run dev"
+echo (A second window opens - you can minimize it. Close it to stop the dashboard.)
+start "Finance Dashboard Server" cmd /k "npm run start"
 
 echo.
 echo Waiting for the dashboard to be ready...

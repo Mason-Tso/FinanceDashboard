@@ -12,6 +12,10 @@ import { runClaudeCli } from "./claudeCli";
 import { parseAnalysis } from "./parse";
 import { buildUserPrompt, SYSTEM_PROMPT, type AnalysisInput } from "./prompt";
 
+// Once the local claude CLI is shown to be unavailable (e.g. not logged in),
+// stop spawning it every request — fall straight back to the rules baseline.
+let claudeCliUnavailable = false;
+
 export async function analyzeStock(
   quote: Quote,
   metrics: KeyMetrics,
@@ -20,6 +24,7 @@ export async function analyzeStock(
   const baseline = rulesAnalysis(quote, metrics);
   const provider = env.ai.provider;
   if (provider === "rules") return baseline;
+  if (provider === "claude-cli" && claudeCliUnavailable) return baseline;
 
   const input: AnalysisInput = { quote, metrics, news, baseline };
   const user = buildUserPrompt(input);
@@ -27,7 +32,12 @@ export async function analyzeStock(
   try {
     if (provider === "claude-cli") {
       const raw = await runClaudeCli(`${SYSTEM_PROMPT}\n\n${user}`, env.ai.model || "sonnet");
-      return parseAnalysis(raw, quote.symbol, "claude-cli", baseline);
+      const result = parseAnalysis(raw, quote.symbol, "claude-cli", baseline);
+      // If it just echoed the baseline (parse failed / error result), treat as unavailable.
+      if (result.summary === baseline.summary && result.bullish === baseline.bullish) {
+        claudeCliUnavailable = true;
+      }
+      return result;
     }
     if (provider === "anthropic") {
       if (!env.ai.anthropicKey) return baseline;
@@ -42,6 +52,7 @@ export async function analyzeStock(
       return parseAnalysis(raw, quote.symbol, "openai", baseline);
     }
   } catch {
+    if (provider === "claude-cli") claudeCliUnavailable = true;
     return baseline;
   }
   return baseline;
