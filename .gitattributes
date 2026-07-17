@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# Windows batch launchers must keep CRLF line endings
+*.bat text eol=crlf
