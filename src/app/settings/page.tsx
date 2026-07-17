@@ -42,16 +42,15 @@ export default function SettingsPage() {
       <Card className="p-5">
         <SectionTitle>Robinhood via SnapTrade</SectionTitle>
         <p className="mb-4 text-sm text-muted">
-          With SnapTrade personal keys, your account is already provisioned — set your{" "}
-          <code className="tnum text-fg">SNAPTRADE_USER_SECRET</code> and holdings flow in automatically (read-only; the
-          dashboard cannot place trades). Use the button below only to link an additional brokerage.
+          With SnapTrade personal keys, your client + consumer key are enough — the app self-discovers your account and
+          reads holdings automatically (read-only; it cannot place trades). Use the button below only to link an
+          additional brokerage.
         </p>
         <ConnectButton disabled={!env.snaptrade.canReadPortfolio} />
         {!env.snaptrade.canReadPortfolio && (
           <p className="mt-3 text-xs text-warn">
-            Add <code className="tnum">SNAPTRADE_USER_ID</code> (your SnapTrade email) and{" "}
-            <code className="tnum">SNAPTRADE_USER_SECRET</code> (from your SnapTrade dashboard) to{" "}
-            <code className="tnum">.env.local</code>, then restart the dev server.
+            Add <code className="tnum">SNAPTRADE_CLIENT_ID</code> and <code className="tnum">SNAPTRADE_CONSUMER_KEY</code>{" "}
+            to <code className="tnum">.env.local</code>, then restart the dev server.
           </p>
         )}
       </Card>
