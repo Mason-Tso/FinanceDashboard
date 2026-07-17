@@ -3,7 +3,7 @@ import { CongressTable } from "@/components/CongressTable";
 import { InsiderTable } from "@/components/InsiderTable";
 import { NewsList } from "@/components/NewsList";
 import { Card, DeltaPill, SectionTitle, SourceTag } from "@/components/primitives";
-import { rulesAnalysis } from "@/lib/analysis";
+import { analyzeStock } from "@/lib/ai";
 import { getKeyMetrics, getQuote, getStockNews, type KeyMetrics } from "@/lib/fmp";
 import { compact, money } from "@/lib/format";
 import { mockQuote } from "@/lib/mock";
@@ -33,7 +33,7 @@ export default async function StockPage({ params }: { params: Promise<{ symbol: 
   ]);
 
   const quote = quoteR.data;
-  const analysis = rulesAnalysis(quote, metricsR.data);
+  const analysis = await analyzeStock(quote, metricsR.data, newsR.data);
   const rangePct =
     quote.yearLow != null && quote.yearHigh != null && quote.yearHigh > quote.yearLow
       ? ((quote.price - quote.yearLow) / (quote.yearHigh - quote.yearLow)) * 100

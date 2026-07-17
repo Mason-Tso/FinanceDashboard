@@ -90,7 +90,7 @@ export interface StockAnalysis {
   bearish: string[];
   risks: string[];
   /** How the analysis was produced, for transparency. */
-  engine: "rules" | "anthropic" | "openai";
+  engine: "rules" | "claude-cli" | "anthropic" | "openai";
   /** Always shown in the UI. */
   disclaimer: string;
 }

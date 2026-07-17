@@ -11,11 +11,11 @@ function read(name: string): string | undefined {
   return v && v.trim().length > 0 ? v.trim() : undefined;
 }
 
-export type AiProvider = "anthropic" | "openai" | "rules";
+export type AiProvider = "claude-cli" | "anthropic" | "openai" | "rules";
 
 function readAiProvider(): AiProvider {
   const v = (read("AI_PROVIDER") ?? "rules").toLowerCase();
-  if (v === "anthropic" || v === "openai" || v === "rules") return v;
+  if (v === "claude-cli" || v === "anthropic" || v === "openai" || v === "rules") return v;
   return "rules";
 }
 
@@ -54,6 +54,7 @@ export const env = {
     /** Whether the selected provider has what it needs to run. */
     get isConfigured(): boolean {
       if (this.provider === "rules") return true;
+      if (this.provider === "claude-cli") return true; // uses the logged-in CLI, no key
       if (this.provider === "anthropic") return Boolean(this.anthropicKey);
       if (this.provider === "openai") return Boolean(this.openaiKey);
       return false;

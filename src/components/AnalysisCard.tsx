@@ -1,6 +1,13 @@
 import type { StockAnalysis } from "@/lib/types";
 import { Card, SignalBadge } from "./primitives";
 
+const ENGINE_LABEL: Record<StockAnalysis["engine"], string> = {
+  rules: "rules engine",
+  "claude-cli": "Claude (Max)",
+  anthropic: "Claude AI",
+  openai: "GPT AI",
+};
+
 function Bullets({ title, items, tone }: { title: string; items: string[]; tone: "up" | "down" | "warn" }) {
   const dot = tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-warn";
   return (
@@ -29,8 +36,7 @@ export function AnalysisCard({ analysis }: { analysis: StockAnalysis }) {
           <div>
             <div className="text-sm font-semibold text-fg">Signal</div>
             <div className="text-xs text-faint">
-              {analysis.confidence}% confidence ·{" "}
-              {analysis.engine === "rules" ? "rules engine" : `${analysis.engine} AI`}
+              {analysis.confidence}% confidence · {ENGINE_LABEL[analysis.engine]}
             </div>
           </div>
         </div>

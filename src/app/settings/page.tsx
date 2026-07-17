@@ -26,9 +26,11 @@ export default function SettingsPage() {
   const aiDetail =
     env.ai.provider === "rules"
       ? "Rules engine (no LLM)"
-      : env.ai.isConfigured
-        ? `${env.ai.provider} — key present`
-        : `${env.ai.provider} — key missing`;
+      : env.ai.provider === "claude-cli"
+        ? "Claude via local CLI (Max plan)"
+        : env.ai.isConfigured
+          ? `${env.ai.provider} — key present`
+          : `${env.ai.provider} — key missing`;
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
